@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Jexor Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Paystack -->
+    <script src="https://js.paystack.co/v1/inline.js"></script>
+
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+    <style>
+        body { font-family: 'Inter', system_ui, sans-serif; }
+        .hero-gradient {
+            background: linear-gradient(135deg, #fefce8 0%, #fef9c3 100%);
+        }
+        .upload-zone {
+            transition: all 0.3s ease;
+        }
+        .upload-zone:hover {
+            border-color: #eab308;
+            background: #fefce8;
+        }
+        .voice-card {
+            transition: all 0.3s ease;
+        }
+        .voice-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+        }
+    </style>
+</head>
+<body class="bg-zinc-50 min-h-screen">
+
+    <!-- TOP HEADER -->
+    <header class="bg-white border-b sticky top-0 z-50">
+        <div class="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 bg-yellow-400 rounded-2xl flex items-center justify-center">
+                    <i class="fa-solid fa-waveform text-zinc-900 text-2xl"></i>
+                </div>
+                <span class="font-bold text-2xl tracking-tight">Jexor</span>
+            </div>
+            <button onclick="logout()" class="flex items-center gap-2 text-red-500 hover:text-red-600 font-medium">
+                <i class="fa-solid fa-right-from-bracket"></i>
+                <span class="hidden sm:inline">Logout</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- MOBILE NAV -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t md:hidden z-50">
+        <div class="flex items-center justify-around py-2">
+            <a href="#" onclick="navigateTo('dashboard')" class="flex flex-col items-center text-yellow-500">
+                <i class="fa-solid fa-house text-xl"></i>
+                <span class="text-xs mt-1">Home</span>
+            </a>
+            <a href="#" onclick="navigateTo('voices')" class="flex flex-col items-center text-zinc-500">
+                <i class="fa-solid fa-microphone text-xl"></i>
+                <span class="text-xs mt-1">Voices</span>
+            </a>
+            <a href="#" onclick="navigateTo('history')" class="flex flex-col items-center text-zinc-500">
+                <i class="fa-solid fa-clock-rotate-left text-xl"></i>
+                <span class="text-xs mt-1">History</span>
+            </a>
+            <a href="#" onclick="showSettings()" class="flex flex-col items-center text-zinc-500">
+                <i class="fa-solid fa-user text-xl"></i>
+                <span class="text-xs mt-1">Account</span>
+            </a>
+        </div>
+    </nav>
+
+    <div class="max-w-5xl mx-auto px-4 pt-8 pb-24 md:pb-12">
+
+        <div class="text-center mb-10">
+            <h1 class="text-4xl font-bold tracking-tight">Welcome back</h1>
+            <p class="text-zinc-600 mt-2">Clone any voice in under 30 seconds</p>
+        </div>
+
+        <!-- CLONE CARD -->
+        <div class="bg-white rounded-3xl shadow-xl border border-yellow-100 overflow-hidden mb-12">
+            <div class="hero-gradient px-6 py-10 text-center">
+                <div class="inline-flex items-center justify-center w-20 h-20 bg-white rounded-2xl shadow-inner mb-6">
+                    <i class="fa-solid fa-microphone text-5xl text-yellow-500"></i>
+                </div>
+                <h2 class="text-3xl font-semibold mb-3">Clone Your Voice</h2>
+                <p class="text-zinc-600 max-w-sm mx-auto">Upload a clear voice sample (max 30 seconds)</p>
+            </div>
+
+            <div class="p-8">
+                <div id="upload-zone" onclick="document.getElementById('voiceFile').click()"
+                     class="upload-zone border-2 border-dashed border-yellow-300 rounded-3xl h-64 flex flex-col items-center justify-center cursor-pointer">
+                    <i class="fa-solid fa-cloud-arrow-up text-5xl text-yellow-500 mb-4"></i>
+                    <p class="font-semibold text-lg">Upload Voice Sample</p>
+                    <p class="text-zinc-500 text-sm mt-1">MP3, WAV, M4A • Max 30 seconds</p>
+                </div>
+
+                <input type="file" id="voiceFile" accept="audio/*" class="hidden" onchange="handleFileSelect(this)">
+
+                <p id="status" class="mt-6 text-center text-sm font-medium min-h-[28px]"></p>
+
+                <button id="cloneBtn" onclick="cloneVoice()"
+                        class="w-full mt-4 bg-black hover:bg-zinc-900 text-white font-semibold py-6 rounded-3xl text-lg transition-all">
+                    Clone Now
+                </button>
+            </div>
+        </div>
+
+        <!-- MY VOICES SECTION -->
+        <h2 class="text-2xl font-semibold mb-6 flex items-center gap-3">
+            <i class="fa-solid fa-microphone"></i> My Voices
+        </h2>
+        <div id="voices-list" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Voices will be loaded here -->
+        </div>
+
+    </div>
+
+    <!-- SETTINGS MODAL -->
+    <div id="settings-modal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-[100]">
+        <div class="bg-white rounded-3xl w-full max-w-md mx-4">
+            <div class="flex justify-between items-center border-b p-6">
+                <h3 class="text-2xl font-semibold">Account Settings</h3>
+                <button onclick="hideSettings()" class="text-3xl">×</button>
+            </div>
+            <div class="p-6 space-y-6">
+                <div>
+                    <label class="text-sm text-zinc-500">Email</label>
+                    <p id="user-email" class="font-medium">user@example.com</p>
+                </div>
+                <div>
+                    <label class="text-sm text-zinc-500">Plan</label>
+                    <p class="bg-yellow-100 text-yellow-700 px-4 py-1 inline-block rounded-2xl text-sm">Free Plan</p>
+                </div>
+                <button onclick="payWithPaystack()" class="w-full bg-green-500 text-white py-4 rounded-2xl font-semibold">
+                    Upgrade to Pro — ₦8,400
+                </button>
+                <button onclick="logout()" class="w-full border border-red-300 text-red-500 py-4 rounded-2xl">
+                    Logout
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let userData = { ttsUsedToday: 0, limit: 4 };
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAEJvn3gVNYSw-oStmiBgy1A1fPbXG5NjA",
+            authDomain: "jexo-27d9f.firebaseapp.com",
+            projectId: "jexo-27d9f"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        auth.onAuthStateChanged(async user => {
+            if (!user) {
+                window.location.href = "login.html";
+            } else {
+                document.getElementById('user-email').innerText = user.email;
+                await loadUsage(user);
+                await loadVoices(user);
+            }
+        });
+
+        /* ===================== USAGE ===================== */
+        async function loadUsage(user) {
+            const doc = await db.collection("users").doc(user.uid).get();
+            if (doc.exists) userData.ttsUsedToday = doc.data().ttsUsedToday || 0;
+            updateUsageUI();
+        }
+
+        function updateUsageUI() {
+            const remaining = userData.limit - userData.ttsUsedToday;
+            const status = document.getElementById("status");
+            const btn = document.getElementById("cloneBtn");
+
+            if (remaining <= 0) {
+                status.innerHTML = `<span class="text-red-500">Daily limit reached (4/4)</span>`;
+                btn.disabled = true;
+                btn.classList.add("opacity-50");
+            } else {
+                status.innerHTML = `<span class="text-green-600">You have ${remaining}/4 clones left today</span>`;
+                btn.disabled = false;
+            }
+        }
+
+        /* ===================== FILE & CLONE ===================== */
+        function handleFileSelect(input) {
+            const file = input.files[0];
+            if (file) document.getElementById('status').innerHTML = `Selected: <strong>${file.name}</strong>`;
+        }
+
+        async function cloneVoice() {
+            const file = document.getElementById("voiceFile").files[0];
+            const user = auth.currentUser;
+            const status = document.getElementById("status");
+
+            if (!file) return alert("Please upload a voice file first");
+            if (userData.ttsUsedToday >= 4) return alert("Daily limit reached");
+
+            status.innerHTML = `<span class="text-yellow-600">Cloning voice... Please wait</span>`;
+
+            try {
+                // Simulate cloning + get fake audio URL
+                await new Promise(r => setTimeout(r, 2000));
+                
+                const fakeAudioUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"; // Replace with real URL from backend
+
+                // Save to Firestore
+                await saveVoiceToFirestore(user, "My Cloned Voice", fakeAudioUrl);
+
+                // Update usage
+                userData.ttsUsedToday += 1;
+                await db.collection("users").doc(user.uid).set({ ttsUsedToday: userData.ttsUsedToday }, { merge: true });
+
+                status.innerHTML = `✅ Voice cloned successfully!`;
+                await loadVoices(user);
+
+            } catch (err) {
+                status.innerHTML = `<span class="text-red-500">Error cloning voice</span>`;
+            }
+        }
+
+        /* ===================== SAVE VOICE TO FIRESTORE ===================== */
+        async function saveVoiceToFirestore(user, name, audioUrl) {
+            const voiceData = {
+                name: name,
+                audioUrl: audioUrl,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                expiresAt: new Date(Date.now() + 4 * 60 * 60 * 1000) // 4 hours
+            };
+
+            await db.collection("users").doc(user.uid)
+                    .collection("voices").add(voiceData);
+        }
+
+        /* ===================== LOAD VOICES ===================== */
+        async function loadVoices(user) {
+            const snapshot = await db.collection("users").doc(user.uid).collection("voices").get();
+            const container = document.getElementById("voices-list");
+            container.innerHTML = "";
+
+            if (snapshot.empty) {
+                container.innerHTML = `<p class="text-center text-zinc-500 col-span-2 py-12">No voices yet. Clone your first voice above.</p>`;
+                return;
+            }
+
+            snapshot.forEach(doc => {
+                const voice = doc.data();
+                const card = document.createElement("div");
+                card.className = "voice-card bg-white border rounded-3xl p-6";
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-4">
+                        <h4 class="font-semibold">${voice.name}</h4>
+                        <span class="text-xs text-zinc-500">${new Date(voice.createdAt?.toDate()).toLocaleTimeString()}</span>
+                    </div>
+                    <audio controls class="w-full mb-4">
+                        <source src="${voice.audioUrl}" type="audio/mpeg">
+                    </audio>
+                    <div class="flex gap-3">
+                        <a href="${voice.audioUrl}" download class="flex-1 text-center py-3 border rounded-2xl text-sm font-medium hover:bg-zinc-50">
+                            <i class="fa-solid fa-download"></i> Download
+                        </a>
+                        <button onclick="deleteVoice('${doc.id}')" 
+                                class="flex-1 text-center py-3 border border-red-200 text-red-500 rounded-2xl text-sm font-medium hover:bg-red-50">
+                            Delete
+                        </button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        async function deleteVoice(voiceId) {
+            if (confirm("Delete this voice?")) {
+                const user = auth.currentUser;
+                await db.collection("users").doc(user.uid).collection("voices").doc(voiceId).delete();
+                loadVoices(user);
+            }
+        }
+
+        /* ===================== PAYSTACK ===================== */
+        function payWithPaystack() {
+    const user = firebase.auth().currentUser;
+    if (!user) return alert("Login required");
+
+    let handler = PaystackPop.setup({
+        key: "pk_live_0f53852c7eaf45629b79d1fdc750220433915baf",
+        email: user.email,
+        amount: 840000,
+        currency: "NGN",
+
+        callback: function (response) {
+
+            // ONLY SEND REFERENCE TO BACKEND
+            fetch("/.netlify/functions/paystack-webhook", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    event: "charge.success",
+                    data: {
+                        customer: { email: user.email },
+                        amount: 840000,
+                        reference: response.reference
+                    }
+                })
+            })
+            .then(() => {
+                alert("Payment successful! Upgraded to Pro 🎉");
+                location.reload();
+            });
+
+        },
+
+        onClose: function () {
+            alert("Payment cancelled");
+        }
+    });
+
+    handler.openIframe();
+}
+    </script>
+</body>
+</html>
