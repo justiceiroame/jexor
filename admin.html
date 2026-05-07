@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Jexor Admin Panel</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+<style>
+body { font-family: Inter, system-ui; }
+</style>
+</head>
+
+<body class="bg-zinc-950 text-zinc-100 min-h-screen">
+
+<!-- LOGIN -->
+<div id="login-screen" class="min-h-screen flex items-center justify-center px-4">
+  <div class="bg-zinc-900 p-10 rounded-3xl w-full max-w-md border border-zinc-800">
+
+    <h1 class="text-3xl font-bold mb-6">Jexor Admin</h1>
+
+    <input id="admin-email" placeholder="Email"
+      class="w-full mb-3 bg-zinc-800 p-4 rounded-xl">
+
+    <input id="admin-password" type="password" placeholder="Password"
+      class="w-full mb-3 bg-zinc-800 p-4 rounded-xl">
+
+    <button onclick="adminLogin()"
+      class="w-full bg-yellow-400 text-black py-4 rounded-xl font-bold">
+      Login
+    </button>
+
+    <p id="login-error" class="text-red-500 mt-3 hidden"></p>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="admin-dashboard" class="hidden">
+
+<header class="p-6 flex justify-between border-b border-zinc-800">
+  <h1 class="text-2xl font-bold">Admin Dashboard</h1>
+  <button onclick="logout()" class="text-red-400">Logout</button>
+</header>
+
+<!-- ANALYTICS -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 p-6">
+
+  <div class="bg-zinc-900 p-4 rounded-xl">
+    <p>Total Users</p>
+    <h2 id="totalUsers" class="text-2xl font-bold">0</h2>
+  </div>
+
+  <div class="bg-zinc-900 p-4 rounded-xl">
+    <p>Pro Users</p>
+    <h2 id="proUsers" class="text-2xl font-bold text-green-400">0</h2>
+  </div>
+
+  <div class="bg-zinc-900 p-4 rounded-xl">
+    <p>Banned Users</p>
+    <h2 id="bannedUsers" class="text-2xl font-bold text-red-400">0</h2>
+  </div>
+
+  <div class="bg-zinc-900 p-4 rounded-xl">
+    <p>Estimated Revenue</p>
+    <h2 id="revenue" class="text-2xl font-bold text-yellow-400">₦0</h2>
+  </div>
+
+</div>
+
+<!-- USERS TABLE -->
+<div class="p-6">
+  <h2 class="text-xl mb-4">Users</h2>
+
+  <div class="bg-zinc-900 rounded-xl overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="text-zinc-400 border-b border-zinc-800">
+        <tr>
+          <th class="p-3 text-left">Email</th>
+          <th class="p-3">Plan</th>
+          <th class="p-3">Usage</th>
+          <th class="p-3">Status</th>
+        </tr>
+      </thead>
+      <tbody id="usersTable"></tbody>
+    </table>
+  </div>
+</div>
+
+</div>
+
+<script>
+/* ================= FIREBASE ================= */
+firebase.initializeApp({
+  apiKey: "AIzaSyAEJvn3gVNYSw-oStmiBgy1A1fPbXG5NjA",
+  projectId: "jexo-27d9f"
+});
+
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+/* ================= ADMIN LOGIN ================= */
+async function adminLogin() {
+  const email = adminEmail.value;
+  const password = adminPassword.value;
+
+  try {
+    const res = await auth.signInWithEmailAndPassword(email, password);
+    const uid = res.user.uid;
+
+    const userDoc = await db.collection("users").doc(uid).get();
+
+    if (!userDoc.exists || userDoc.data().role !== "admin") {
+      throw new Error("Not admin");
+    }
+
+    loginScreen.classList.add("hidden");
+    adminDashboard.classList.remove("hidden");
+
+    loadDashboard();
+
+  } catch (err) {
+    loginError.classList.remove("hidden");
+    loginError.innerText = "Access denied";
+  }
+}
+
+/* ================= LOAD DASHBOARD ================= */
+async function loadDashboard() {
+
+  const usersSnap = await db.collection("users").get();
+  const txSnap = await db.collection("transactions").get();
+
+  let total = 0;
+  let pro = 0;
+  let banned = 0;
+  let revenue = 0;
+
+  const tbody = document.getElementById("usersTable");
+  tbody.innerHTML = "";
+
+  usersSnap.forEach(doc => {
+    const u = doc.data();
+    total++;
+
+    if (u.plan === "pro") pro++;
+    if (u.banned) banned++;
+
+    tbody.innerHTML += `
+      <tr class="border-t border-zinc-800">
+        <td class="p-3">${u.email}</td>
+        <td class="p-3 text-center">${u.plan || "free"}</td>
+        <td class="p-3 text-center">${u.ttsUsedToday || 0}/4</td>
+        <td class="p-3 text-center">${u.banned ? "Banned" : "Active"}</td>
+      </tr>
+    `;
+  });
+
+  // REAL REVENUE FROM TRANSACTIONS
+  txSnap.forEach(doc => {
+    revenue += doc.data().amount || 0;
+  });
+
+  totalUsers.innerText = total;
+  proUsers.innerText = pro;
+  bannedUsers.innerText = banned;
+  revenue.innerText = "₦" + revenue.toLocaleString();
+}
+
+/* ================= LOGOUT ================= */
+function logout() {
+  auth.signOut().then(() => location.reload());
+}
+</script>
+
+</body>
+</html>
